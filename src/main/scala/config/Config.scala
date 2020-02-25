@@ -1,7 +1,7 @@
 package orco.config
 
-import zio._
 import pureconfig.ConfigSource
+import zio._
 
 case class AppConfig(api: ApiConfig, github: GithubConfig)
 case class ApiConfig(endpoint: String, port: Int)

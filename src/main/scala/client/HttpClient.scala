@@ -1,21 +1,20 @@
 package orco.httpClient
 
+import cats.implicits._
 import io.circe.{ Decoder }
-import org.http4s.client.dsl._
-import org.http4s.headers._
-import org.http4s.{ AuthScheme, Credentials, MediaType }
-import org.http4s.Method._
+import org.http4s.{ Headers, Request }
+import org.http4s.Method.GET
+import org.http4s.Status.Successful
 import org.http4s.circe._
 import org.http4s.client.Client
+import org.http4s.client.dsl._
+import org.http4s.headers._
+import org.http4s.util.CaseInsensitiveString
+import org.http4s.{ AuthScheme, Credentials, MediaType }
 import org.http4s.{ EntityDecoder, Uri }
 import zio._
 import zio.console.Console
 import zio.interop.catz._
-import org.http4s.Status.Successful
-import cats.implicits._
-import org.http4s.Headers
-import org.http4s.Request
-import org.http4s.util.CaseInsensitiveString
 
 object dsl extends Http4sClientDsl[Task]
 import dsl._

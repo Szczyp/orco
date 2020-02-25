@@ -1,14 +1,15 @@
 package orco.api
 
-import zio._
-import zio.interop.catz._
-import org.http4s.dsl.Http4sDsl
-import org.http4s.{ HttpRoutes, Uri }
-import orco._
-import orco.httpClient.HttpClient
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.http4s.circe._
+import org.http4s.dsl.Http4sDsl
+import org.http4s.{ HttpRoutes, Uri }
+import zio._
+import zio.interop.catz._
+
+import orco._
+import orco.httpClient.HttpClient
 
 class Api[R <: HttpClient] {
   type ApiTask[T] = RIO[R, T]

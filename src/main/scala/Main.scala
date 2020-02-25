@@ -1,24 +1,26 @@
 package orco
 
-import orco.api.Api
-import orco.config._
-import orco.httpClient.HttpClient
+import cats.effect.Resource
+import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.headers.{ `User-Agent`, AgentProduct }
+import org.http4s.implicits._
 import org.http4s.server.blaze.BlazeServerBuilder
 import scala.concurrent.ExecutionContext
 import zio._
 import zio.clock._
 import zio.console._
 import zio.interop.catz._
-import cats.effect.Resource
-import org.http4s.client.Client
-import org.http4s.headers.{ `User-Agent`, AgentProduct }
-import org.http4s.implicits._
+
+import orco.api.Api
+import orco.config._
+import orco.httpClient.HttpClient
 
 object Main extends App {
-
   type AppEnv     = Clock with HttpClient
   type AppTask[T] = RIO[AppEnv, T]
+
+  val api = new Api[AppEnv]
 
   val program: Task[Unit] =
     for {
@@ -26,7 +28,7 @@ object Main extends App {
       cr   <- client
       _ <- cr.use(
             c =>
-              serve(conf.api)
+              serve(api, conf.api)
                 .provide(new Clock.Live with HttpClient.Live with Console.Live {
                   override def client = c
                   override def token  = conf.github.token
@@ -51,9 +53,7 @@ object Main extends App {
             .resource
       )
 
-  private def serve(conf: ApiConfig): RIO[AppEnv, Unit] = {
-    val api = new Api[AppEnv]
-
+  private def serve(api: Api[AppEnv], conf: ApiConfig): RIO[AppEnv, Unit] =
     ZIO
       .runtime[AppEnv]
       .flatMap(
@@ -65,6 +65,4 @@ object Main extends App {
             .compile
             .drain
       )
-  }
-
 }
