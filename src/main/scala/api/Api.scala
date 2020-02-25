@@ -2,9 +2,10 @@ package orco.api
 
 import io.circe.generic.auto._
 import io.circe.syntax._
+import org.http4s.HttpRoutes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{ HttpRoutes, Uri }
+import org.http4s.implicits._
 import zio._
 import zio.interop.catz._
 
@@ -17,17 +18,20 @@ class Api[R <: HttpClient] {
   private val dsl = Http4sDsl[ApiTask]
   import dsl._
 
-  case class Repo(name: String, contributors_url: Uri)
+  case class Repo(name: String)
   case class Contributor(login: String, contributions: Int)
+
+  val baseUri = uri"https://api.github.com"
 
   val service =
     HttpRoutes
       .of[ApiTask] {
-        case GET -> Root / "org" / orgName / "contributors" =>
+        case GET -> Root / "org" / orgName / "contributors" => {
+          val uri = baseUri / "orgs" / orgName / "repos"
           for {
-            uri      <- ZIO.fromEither(Uri.fromString(s"https://api.github.com/orgs/${orgName}/repos"))
-            repos    <- httpClient.get[Repo](uri)
-            contribs <- ZIO.foreachPar(repos)(r => httpClient.get[Contributor](r.contributors_url))
+            repos <- httpClient.get[Repo](uri)
+            repoUris = repos.map(r => baseUri / "repos" / orgName / r.name / "contributors")
+            contribs <- ZIO.foreachPar(repoUris)(httpClient.get[Contributor])
             res <- Ok(
                     contribs.flatten
                       .groupBy(_.login)
@@ -39,5 +43,6 @@ class Api[R <: HttpClient] {
                       .asJson
                   )
           } yield res
+        }
       }
 }
