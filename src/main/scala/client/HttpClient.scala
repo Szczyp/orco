@@ -52,7 +52,7 @@ object HttpClient {
                         .decode(resp, strict = false)
                         .leftWiden[Throwable]
                         .rethrowT
-              more <- Task.collectAllPar(pages(resp.headers, req).map(r => client.expect[List[T]](r)))
+              more <- Task.foreachPar(pages(resp.headers, req))(client.expect[List[T]])
              } yield (first :: more).flatten)
               .orElse(Task.succeed(List.empty)) <*
               console.putStrLn(resp.headers.get(CaseInsensitiveString("X-RateLimit-Remaining")).toString())

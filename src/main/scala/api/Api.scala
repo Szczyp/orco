@@ -27,7 +27,7 @@ class Api[R <: HttpClient] {
           for {
             uri      <- ZIO.fromEither(Uri.fromString(s"https://api.github.com/orgs/${orgName}/repos"))
             repos    <- httpClient.get[Repo](uri)
-            contribs <- ZIO.collectAllPar(repos.map(r => httpClient.get[Contributor](r.contributors_url)))
+            contribs <- ZIO.foreachPar(repos)(r => httpClient.get[Contributor](r.contributors_url))
             res <- Ok(
                     contribs.flatten
                       .groupBy(_.login)
