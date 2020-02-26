@@ -2,7 +2,7 @@ package orco.httpClient
 
 import cats.implicits._
 import io.circe.{ Decoder }
-import org.http4s.{ Headers, Request }
+import org.http4s.{ Headers }
 import org.http4s.Method.GET
 import org.http4s.Status.Successful
 import org.http4s.circe._
@@ -19,13 +19,18 @@ import zio.interop.catz._
 object dsl extends Http4sClientDsl[Task]
 import dsl._
 
+case class HttpClientResult[T](result: T, headers: Headers)
+
+case class HttpClientError(uri: Uri, msg: String) extends Throwable
+
 trait HttpClient {
   val httpClient: HttpClient.Service[Any]
 }
 
 object HttpClient {
   trait Service[R] {
-    def get[T](uri: Uri)(implicit decoder: Decoder[List[T]]): RIO[R, List[T]]
+
+    def get[T](uri: Uri)(implicit decoder: Decoder[T]): RIO[R, HttpClientResult[T]]
   }
 
   trait Live extends HttpClient {
@@ -36,7 +41,7 @@ object HttpClient {
     implicit def entityDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[Task, A] = jsonOf[Task, A]
 
     final val httpClient = new Service[Any] {
-      def get[T](uri: Uri)(implicit decoder: Decoder[List[T]]): Task[List[T]] = {
+      def get[T](uri: Uri)(implicit decoder: Decoder[T]): Task[HttpClientResult[T]] = {
         val req = token match {
           case Some(token) =>
             GET(uri, Authorization(Credentials.Token(AuthScheme.Bearer, token)), Accept(MediaType.application.json))
@@ -45,30 +50,19 @@ object HttpClient {
         }
 
         console.putStrLn(uri.toString()) *>
-        client.fetch[List[T]](req) {
-          case Successful(resp) =>
-            (for {
-              first <- entityDecoder(decoder)
-                        .decode(resp, strict = false)
-                        .leftWiden[Throwable]
-                        .rethrowT
-              more <- Task.foreachPar(pages(resp.headers, req))(client.expect[List[T]])
-             } yield (first :: more).flatten)
-              .orElse(Task.succeed(List.empty)) <*
-              console.putStrLn(resp.headers.get(CaseInsensitiveString("X-RateLimit-Remaining")).toString())
+          client.fetch[HttpClientResult[T]](req) {
+            case Successful(resp) =>
+              entityDecoder(decoder)
+                .decode(resp, strict = false)
+                .leftWiden[Throwable]
+                .rethrowT
+                .map(res => HttpClientResult(res, resp.headers)) <*
+                console.putStrLn(resp.headers.get(CaseInsensitiveString("X-RateLimit-Remaining")).toString())
 
-          case failedResponse =>
-            Task.fail(new Exception(failedResponse.status.reason))
-         }
+            case failedResponse =>
+              Task.fail(HttpClientError(uri, failedResponse.status.reason))
+          }
       }
     }
-
-    private def pages(headers: Headers, request: Task[Request[Task]]): List[Task[Request[Task]]] =
-      headers.get(Link) match {
-        case None => List.empty
-        case Some(link) =>
-          val last = link.values.last.uri.query.params("page").toInt
-          (2 to last).map(page => request.map(r => r.withUri(r.uri.withQueryParam("page", page)))).toList
-      }
   }
 }

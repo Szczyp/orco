@@ -7,6 +7,8 @@ val PureConfigVersion = "0.12.2"
 resolvers += Resolver.sonatypeRepo("releases")
 resolvers += Resolver.sonatypeRepo("snapshots")
 
+cancelable in Global := true
+
 lazy val root = (project in file("."))
   .settings(
     organization := "szczyp",
