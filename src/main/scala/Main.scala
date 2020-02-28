@@ -27,9 +27,8 @@ object Main extends App {
       _ <- cr.use(
             c =>
               serve(conf)
-                .provide(new Clock.Live with HttpClient.Live with Console.Live {
+                .provide(new Clock.Live with HttpClient.Live with Console.Live with Config.Live {
                   override def client = c
-                  override def token  = conf.token
                 })
           )
     } yield ()

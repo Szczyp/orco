@@ -20,9 +20,18 @@ object Config {
     val config: Service[Any] = new Service[Any] {
       import pureconfig.generic.auto._
 
-      val load: Task[AppConfig] =
-        IO.fromEither(ConfigSource.default.load[AppConfig])
-          .mapError(e => ConfigError(e.toList.mkString(", ")))
+      val ref: UIO[Ref[Option[AppConfig]]] = Ref.make(None)
+
+      val load: Task[AppConfig] = ref.flatMap(_.get).flatMap {
+        case None =>
+          for {
+            c <- IO
+                  .fromEither(ConfigSource.default.load[AppConfig])
+                  .mapError(e => ConfigError(e.toList.mkString(", ")))
+            _ <- ref.flatMap(_.set(Some(c)))
+          } yield c
+        case Some(c) => ZIO.succeed(c)
+      }
     }
   }
   object Live extends Live

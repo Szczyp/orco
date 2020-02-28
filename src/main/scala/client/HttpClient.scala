@@ -10,11 +10,12 @@ import org.http4s.client.Client
 import org.http4s.client.dsl._
 import org.http4s.headers._
 import org.http4s.util.CaseInsensitiveString
-import org.http4s.{ AuthScheme, Credentials, MediaType }
-import org.http4s.{ EntityDecoder, Uri }
+import org.http4s._
 import zio._
 import zio.console.Console
 import zio.interop.catz._
+
+import orco.config.Config
 
 object dsl extends Http4sClientDsl[Task]
 import dsl._
@@ -35,19 +36,24 @@ object HttpClient {
 
   trait Live extends HttpClient {
     def client: Client[Task]
-    def token: Option[String]
+    def config: Config.Service[Any]
     def console: Console.Service[Any]
 
     implicit def entityDecoder[A](implicit decoder: Decoder[A]): EntityDecoder[Task, A] = jsonOf[Task, A]
 
     final val httpClient = new Service[Any] {
       def get[T](uri: Uri)(implicit decoder: Decoder[T]): Task[HttpClientResult[T]] = {
-        val req = token match {
-          case Some(token) =>
-            GET(uri, Authorization(Credentials.Token(AuthScheme.Bearer, token)), Accept(MediaType.application.json))
-          case None =>
-            GET(uri, Accept(MediaType.application.json))
-        }
+        val req: Task[Request[Task]] =
+          config.load.flatMap(_.token match {
+            case Some(token) =>
+              GET(
+                uri,
+                Authorization(Credentials.Token(AuthScheme.Bearer, token)),
+                Accept(MediaType.application.json)
+              )
+            case None =>
+              GET(uri, Accept(MediaType.application.json))
+          })
 
         console.putStrLn(uri.toString()) *>
           client.fetch[HttpClientResult[T]](req) {
