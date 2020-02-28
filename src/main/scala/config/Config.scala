@@ -3,9 +3,7 @@ package orco.config
 import pureconfig.ConfigSource
 import zio._
 
-case class AppConfig(api: ApiConfig, github: GithubConfig)
-case class ApiConfig(endpoint: String, port: Int)
-case class GithubConfig(token: Option[String])
+case class AppConfig(endpoint: String, port: Int, token: Option[String], connections: Int)
 
 case class ConfigError(msg: String) extends RuntimeException(msg)
 
@@ -32,7 +30,7 @@ object Config {
   trait Test extends Config {
     val config: Service[Any] = new Service[Any] {
       val load: Task[AppConfig] = Task.effectTotal(
-        AppConfig(ApiConfig("127.0.0.1", 8080), GithubConfig(Some("token")))
+        AppConfig("127.0.0.1", 8080, Some("token"), 10)
       )
     }
   }

@@ -13,7 +13,7 @@ import zio.interop.catz._
 import orco._
 import orco.httpClient.{ HttpClient, HttpClientError, HttpClientResult }
 
-class Api[R <: HttpClient] {
+class Api[R <: HttpClient](connections: Int) {
   type ApiTask[T] = RIO[R, T]
 
   private val dsl = Http4sDsl[ApiTask]
@@ -30,7 +30,7 @@ class Api[R <: HttpClient] {
       .orElse(ZIO.succeed(HttpClientResult(List.empty, Headers.empty)))
 
   def foreachPar[R1, E, A, B](xs: Iterable[A])(a: A => ZIO[R1, E, B]): ZIO[R1, E, List[B]] =
-    ZIO.foreachParN(100)(xs)(a)
+    ZIO.foreachParN(connections)(xs)(a)
 
   def pages(headers: Headers) =
     headers.get(Link) match {

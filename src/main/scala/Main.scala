@@ -20,18 +20,16 @@ object Main extends App {
   type AppEnv     = Clock with HttpClient
   type AppTask[T] = RIO[AppEnv, T]
 
-  val api = new Api[AppEnv]
-
   val program: Task[Unit] =
     for {
       conf <- config.load.provide(Config.Live)
-      cr   <- client
+      cr   <- client(conf.connections)
       _ <- cr.use(
             c =>
-              serve(api, conf.api)
+              serve(conf)
                 .provide(new Clock.Live with HttpClient.Live with Console.Live {
                   override def client = c
-                  override def token  = conf.github.token
+                  override def token  = conf.token
                 })
           )
     } yield ()
@@ -43,24 +41,24 @@ object Main extends App {
         _ => IO.succeed(0)
       )
 
-  private def client: UIO[Resource[Task, Client[Task]]] =
+  private def client(connections: Int): UIO[Resource[Task, Client[Task]]] =
     ZIO.runtime
       .map(
         implicit rts =>
           BlazeClientBuilder(ExecutionContext.global)
             .withUserAgent(`User-Agent`(AgentProduct("orco")))
-            .withMaxTotalConnections(100)
+            .withMaxTotalConnections(connections)
             .resource
       )
 
-  private def serve(api: Api[AppEnv], conf: ApiConfig): RIO[AppEnv, Unit] =
+  private def serve(conf: AppConfig): RIO[AppEnv, Unit] =
     ZIO
       .runtime[AppEnv]
       .flatMap(
         implicit rts =>
           BlazeServerBuilder[AppTask]
             .bindHttp(conf.port, conf.endpoint)
-            .withHttpApp(api.service.orNotFound)
+            .withHttpApp(new Api[AppEnv](conf.connections).service.orNotFound)
             .serve
             .compile
             .drain
